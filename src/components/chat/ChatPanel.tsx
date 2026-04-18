@@ -3,7 +3,14 @@ import { ChatBubble } from "./ChatBubble";
 import { ChatComposer } from "./ChatComposer";
 import { TypingIndicator } from "./TypingIndicator";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Menu } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import {
+  createConversation,
+  insertMessage,
+  listMessages,
+  renameConversation,
+} from "@/lib/chat-db";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -14,12 +21,51 @@ const SUGGESTIONS = [
   "Help me name my coffee shop",
 ];
 
-export function ChatPanel() {
+type Props = {
+  conversationId: string | null;
+  onConversationCreated: (id: string) => void;
+  onConversationsChanged: () => void;
+  onOpenSidebar?: () => void;
+};
+
+export function ChatPanel({
+  conversationId,
+  onConversationCreated,
+  onConversationsChanged,
+  onOpenSidebar,
+}: Props) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Load history when conversation changes
+  useEffect(() => {
+    let cancelled = false;
+    if (!conversationId) {
+      setMessages([]);
+      return;
+    }
+    setLoadingHistory(true);
+    listMessages(conversationId)
+      .then((rows) => {
+        if (cancelled) return;
+        setMessages(rows.map((r) => ({ role: r.role, content: r.content })));
+      })
+      .catch((e) => {
+        console.error(e);
+        toast.error("Could not load chat history");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingHistory(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -33,14 +79,47 @@ export function ChatPanel() {
   };
 
   const send = async (text?: string) => {
+    if (!user) return;
     const content = (text ?? input).trim();
     if (!content || isStreaming) return;
+
+    // Ensure we have a conversation
+    let convId = conversationId;
+    let isFresh = false;
+    if (!convId) {
+      try {
+        const conv = await createConversation(user.id);
+        convId = conv.id;
+        isFresh = true;
+        onConversationCreated(conv.id);
+      } catch (e) {
+        console.error(e);
+        toast.error("Could not start a new chat");
+        return;
+      }
+    }
 
     const userMsg: Msg = { role: "user", content };
     const next = [...messages, userMsg];
     setMessages(next);
     setInput("");
     setIsStreaming(true);
+
+    // Persist user message (fire-and-forget; errors logged)
+    insertMessage({
+      conversationId: convId!,
+      userId: user.id,
+      role: "user",
+      content,
+    }).catch((e) => console.error("persist user msg failed", e));
+
+    // If fresh, auto-title from first message
+    if (isFresh) {
+      const title = content.length > 50 ? content.slice(0, 50).trim() + "…" : content;
+      renameConversation(convId!, title)
+        .then(() => onConversationsChanged())
+        .catch((e) => console.error("rename failed", e));
+    }
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -114,6 +193,18 @@ export function ChatPanel() {
           }
         }
       }
+
+      // Persist assistant message
+      if (assistantSoFar) {
+        insertMessage({
+          conversationId: convId!,
+          userId: user.id,
+          role: "assistant",
+          content: assistantSoFar,
+        })
+          .then(() => onConversationsChanged())
+          .catch((e) => console.error("persist assistant failed", e));
+      }
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         console.error(e);
@@ -125,85 +216,90 @@ export function ChatPanel() {
     }
   };
 
-  const isEmpty = messages.length === 0;
+  const isEmpty = messages.length === 0 && !loadingHistory;
 
   return (
-    <div className="mx-auto flex h-[100dvh] w-full max-w-3xl flex-col px-3 sm:px-6">
+    <div className="flex h-full w-full flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between py-4">
+      <header className="flex items-center gap-2 px-3 py-3 sm:px-6">
+        {onOpenSidebar && (
+          <button
+            onClick={onOpenSidebar}
+            className="rounded-xl p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground md:hidden"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[var(--primary-glow)] text-lg font-bold text-primary-foreground shadow-md">
+          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[var(--primary-glow)] text-base font-bold text-primary-foreground shadow-md md:hidden">
             ☀
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight">Sunny</h1>
-            <p className="text-xs text-muted-foreground">Your friendly AI companion</p>
+            <h1 className="text-base font-bold tracking-tight sm:text-lg">Sunny</h1>
+            <p className="text-[11px] text-muted-foreground sm:text-xs">
+              Your friendly AI companion
+            </p>
           </div>
         </div>
-        {messages.length > 0 && (
-          <button
-            onClick={() => setMessages([])}
-            className="rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-          >
-            New chat
-          </button>
-        )}
       </header>
 
-      {/* Messages */}
-      <div
-        ref={scrollRef}
-        className="flex-1 space-y-4 overflow-y-auto py-4 [scrollbar-width:thin]"
-      >
-        {isEmpty ? (
-          <div className="flex h-full flex-col items-center justify-center gap-6 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-primary to-[var(--primary-glow)] text-3xl shadow-lg">
-              <Sparkles className="h-7 w-7 text-primary-foreground" />
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden px-3 sm:px-6">
+        {/* Messages */}
+        <div
+          ref={scrollRef}
+          className="flex-1 space-y-4 overflow-y-auto py-4 [scrollbar-width:thin]"
+        >
+          {isEmpty ? (
+            <div className="flex h-full flex-col items-center justify-center gap-6 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-primary to-[var(--primary-glow)] text-3xl shadow-lg">
+                <Sparkles className="h-7 w-7 text-primary-foreground" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                  Hi, I'm Sunny ☀
+                </h2>
+                <p className="max-w-sm text-sm text-muted-foreground sm:text-base">
+                  Ask me anything, brainstorm an idea, or just say hello. I'm here to help.
+                </p>
+              </div>
+              <div className="grid w-full max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => send(s)}
+                    className="bubble-assistant rounded-2xl px-4 py-3 text-left text-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                Hi, I'm Sunny ☀
-              </h2>
-              <p className="max-w-sm text-sm text-muted-foreground sm:text-base">
-                Ask me anything, brainstorm an idea, or just say hello. I'm here to help.
-              </p>
-            </div>
-            <div className="grid w-full max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => send(s)}
-                  className="bubble-assistant rounded-2xl px-4 py-3 text-left text-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  {s}
-                </button>
+          ) : (
+            <>
+              {messages.map((m, i) => (
+                <ChatBubble key={i} role={m.role} content={m.content} />
               ))}
-            </div>
-          </div>
-        ) : (
-          <>
-            {messages.map((m, i) => (
-              <ChatBubble key={i} role={m.role} content={m.content} />
-            ))}
-            {isStreaming &&
-              (messages[messages.length - 1]?.role === "user" ||
-                !messages[messages.length - 1]?.content) && <TypingIndicator />}
-          </>
-        )}
-      </div>
+              {isStreaming &&
+                (messages[messages.length - 1]?.role === "user" ||
+                  !messages[messages.length - 1]?.content) && <TypingIndicator />}
+            </>
+          )}
+        </div>
 
-      {/* Composer */}
-      <div className="pb-4 pt-2">
-        <ChatComposer
-          value={input}
-          onChange={setInput}
-          onSend={() => send()}
-          onStop={stop}
-          isStreaming={isStreaming}
-        />
-        <p className="mt-2 text-center text-[11px] text-muted-foreground">
-          Sunny can make mistakes. Double-check important info.
-        </p>
+        {/* Composer */}
+        <div className="pb-4 pt-2">
+          <ChatComposer
+            value={input}
+            onChange={setInput}
+            onSend={() => send()}
+            onStop={stop}
+            isStreaming={isStreaming}
+          />
+          <p className="mt-2 text-center text-[11px] text-muted-foreground">
+            Sunny can make mistakes. Double-check important info.
+          </p>
+        </div>
       </div>
     </div>
   );
