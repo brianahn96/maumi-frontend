@@ -48,6 +48,7 @@ export function ChatPanel({
   // Load history when conversation changes
   useEffect(() => {
     let cancelled = false;
+    console.log("[ChatPanel] history effect, convId=", conversationId, "loadedId=", loadedIdRef.current, "locallyCreated=", conversationId ? locallyCreatedRef.current.has(conversationId) : false);
     if (!conversationId) {
       setMessages([]);
       loadedIdRef.current = null;
@@ -63,6 +64,7 @@ export function ChatPanel({
     listMessages(conversationId)
       .then((rows) => {
         if (cancelled) return;
+        console.log("[ChatPanel] history loaded for", conversationId, "rows=", rows.length);
         setMessages(rows.map((r) => ({ role: r.role, content: r.content })));
         loadedIdRef.current = conversationId;
       })
