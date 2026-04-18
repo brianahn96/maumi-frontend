@@ -114,6 +114,7 @@ export function ChatPanel({
 
     const userMsg: Msg = { role: "user", content };
     const next = [...messages, userMsg];
+    console.log("[ChatPanel] send: setting messages, count=", next.length, "isFresh=", isFresh, "convId=", convId);
     setMessages(next);
     setInput("");
     setIsStreaming(true);
