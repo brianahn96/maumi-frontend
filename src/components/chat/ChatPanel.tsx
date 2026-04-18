@@ -102,6 +102,8 @@ export function ChatPanel({
         const conv = await createConversation(user.id);
         convId = conv.id;
         isFresh = true;
+        locallyCreatedRef.current.add(conv.id);
+        loadedIdRef.current = conv.id;
         onConversationCreated(conv.id);
       } catch (e) {
         console.error(e);
