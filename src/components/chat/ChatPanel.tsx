@@ -233,6 +233,7 @@ export function ChatPanel({
   };
 
   const isEmpty = messages.length === 0 && !loadingHistory;
+  console.log("[ChatPanel] render: messages=", messages.map(m => `${m.role}(${m.content.length})`).join(","), "isStreaming=", isStreaming);
 
   return (
     <div className="flex h-full w-full flex-col">
