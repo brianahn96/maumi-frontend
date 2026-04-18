@@ -35,7 +35,14 @@ export function ChatPanel({
   onOpenSidebar,
 }: Props) {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const [messages, _setMessages] = useState<Msg[]>([]);
+  const setMessages: typeof _setMessages = (updater) => {
+    _setMessages((prev) => {
+      const next = typeof updater === "function" ? (updater as (p: Msg[]) => Msg[])(prev) : updater;
+      console.log("[ChatPanel] setMessages:", prev.length, "->", next.length, new Error().stack?.split("\n").slice(1, 4).join(" | "));
+      return next;
+    });
+  };
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
