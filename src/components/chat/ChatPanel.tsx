@@ -41,12 +41,22 @@ export function ChatPanel({
   const [loadingHistory, setLoadingHistory] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Conversations created locally in this panel — skip remote history reload for them
+  const locallyCreatedRef = useRef<Set<string>>(new Set());
+  const loadedIdRef = useRef<string | null>(null);
 
   // Load history when conversation changes
   useEffect(() => {
     let cancelled = false;
     if (!conversationId) {
       setMessages([]);
+      loadedIdRef.current = null;
+      return;
+    }
+    // Don't reload if we already have this conversation loaded (e.g. just created it locally)
+    if (loadedIdRef.current === conversationId) return;
+    if (locallyCreatedRef.current.has(conversationId)) {
+      loadedIdRef.current = conversationId;
       return;
     }
     setLoadingHistory(true);
@@ -54,6 +64,7 @@ export function ChatPanel({
       .then((rows) => {
         if (cancelled) return;
         setMessages(rows.map((r) => ({ role: r.role, content: r.content })));
+        loadedIdRef.current = conversationId;
       })
       .catch((e) => {
         console.error(e);
@@ -91,6 +102,8 @@ export function ChatPanel({
         const conv = await createConversation(user.id);
         convId = conv.id;
         isFresh = true;
+        locallyCreatedRef.current.add(conv.id);
+        loadedIdRef.current = conv.id;
         onConversationCreated(conv.id);
       } catch (e) {
         console.error(e);
