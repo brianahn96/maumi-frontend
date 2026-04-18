@@ -150,8 +150,64 @@
     border-color: var(--color-border);
   }
 
+  html,
+  body {
+    font-family: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, sans-serif;
+  }
+
   body {
     background-color: var(--color-background);
+    background-image: var(--gradient-bg);
+    background-attachment: fixed;
     color: var(--color-foreground);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  .bubble-user {
+    background: var(--bubble-user);
+    color: var(--color-primary-foreground);
+    box-shadow: var(--shadow-soft);
+  }
+  .bubble-assistant {
+    background: var(--bubble-assistant);
+    color: var(--color-foreground);
+    box-shadow: var(--shadow-bubble);
+    border: 1px solid var(--color-border);
+  }
+  .typing-dot {
+    animation: typing-bounce 1.2s infinite ease-in-out;
+  }
+  .typing-dot:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .typing-dot:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+  @keyframes typing-bounce {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+    30% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
+  }
+  .fade-in-up {
+    animation: fade-in-up 0.3s ease-out;
+  }
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
