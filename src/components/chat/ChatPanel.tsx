@@ -268,7 +268,7 @@ export function ChatPanel({
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden px-3 sm:px-6">
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden px-3 lg:max-w-5xl xl:max-w-6xl sm:px-6">
         {/* Messages */}
         <div
           ref={scrollRef}
