@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { Sparkles } from "lucide-react";
 type Mode = "signin" | "signup";
 
 export function AuthForm() {
+  const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,20 +21,13 @@ export function AuthForm() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (error) {
-          toast.error(error.message);
-        } else {
-          toast.success("Welcome to Sunny ☀");
-        }
+        await signUp(email, password);
+        toast.success("Welcome to Sunny ☀");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) toast.error(error.message);
+        await signIn(email, password);
       }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setBusy(false);
     }
