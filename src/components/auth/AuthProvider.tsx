@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import {
   bootstrapSession,
+  fetchMe,
   login as apiLogin,
   logout as apiLogout,
   register as apiRegister,
   type AuthUser,
 } from "@/lib/api-client";
+import { setChatStorageUser } from "@/lib/chat-db";
 
 type AuthContextValue = {
   user: AuthUser | null;
