@@ -23,6 +23,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Keep chat-db scoped to the current user
+  useEffect(() => {
+    setChatStorageUser(user?.id ?? null);
+  }, [user?.id]);
+
   useEffect(() => {
     let cancelled = false;
     bootstrapSession()
@@ -45,15 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     signIn: async (email, password) => {
       await apiLogin(email, password);
-      // Prefer /me for canonical user shape
-      const me = await import("@/lib/api-client").then((m) => m.fetchMe());
+      const me = await fetchMe();
       setUser(me);
     },
     signUp: async (email, password) => {
       await apiRegister(email, password);
-      // Auto-login after register
       await apiLogin(email, password);
-      const me = await import("@/lib/api-client").then((m) => m.fetchMe());
+      const me = await fetchMe();
       setUser(me);
     },
     signOut: async () => {
