@@ -1,42 +1,62 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  bootstrapSession,
+  login as apiLogin,
+  logout as apiLogout,
+  register as apiRegister,
+  type AuthUser,
+} from "@/lib/api-client";
 
 type AuthContextValue = {
-  user: User | null;
-  session: Session | null;
+  user: AuthUser | null;
   loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up listener FIRST
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      setLoading(false);
-    });
-
-    // THEN check existing session
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-
-    return () => sub.subscription.unsubscribe();
+    let cancelled = false;
+    bootstrapSession()
+      .then((u) => {
+        if (!cancelled) setUser(u);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const value: AuthContextValue = {
-    user: session?.user ?? null,
-    session,
+    user,
     loading,
+    signIn: async (email, password) => {
+      await apiLogin(email, password);
+      // Prefer /me for canonical user shape
+      const me = await import("@/lib/api-client").then((m) => m.fetchMe());
+      setUser(me);
+    },
+    signUp: async (email, password) => {
+      await apiRegister(email, password);
+      // Auto-login after register
+      await apiLogin(email, password);
+      const me = await import("@/lib/api-client").then((m) => m.fetchMe());
+      setUser(me);
+    },
     signOut: async () => {
-      await supabase.auth.signOut();
+      await apiLogout();
+      setUser(null);
     },
   };
 
