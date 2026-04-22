@@ -7,9 +7,9 @@ import { Sparkles, Menu } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   createConversation,
-  insertMessage,
   listMessages,
   renameConversation,
+  streamChat,
 } from "@/lib/chat-db";
 
 type Msg = { role: "user" | "assistant"; content: string };
