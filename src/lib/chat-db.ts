@@ -23,44 +23,10 @@ export type DbMessage = {
   created_at: string;
 };
 
-// ---------- Per-user message storage (localStorage) ----------
+// ---------- Per-user storage hook (kept for backwards compat; no-op now) ----------
 
-type MessageStore = Record<string, DbMessage[]>; // by conversation_id
-
-let currentUserKey: string | null = null;
-
-export function setChatStorageUser(userKey: string | null) {
-  currentUserKey = userKey;
-}
-
-function messagesStorageKey(): string | null {
-  if (!currentUserKey) return null;
-  return `sunny:chat-messages:${currentUserKey}`;
-}
-
-function readMessages(): MessageStore {
-  const key = messagesStorageKey();
-  if (!key || typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return {};
-    return JSON.parse(raw) as MessageStore;
-  } catch {
-    return {};
-  }
-}
-
-function writeMessages(store: MessageStore) {
-  const key = messagesStorageKey();
-  if (!key || typeof window === "undefined") return;
-  window.localStorage.setItem(key, JSON.stringify(store));
-}
-
-function uid() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+export function setChatStorageUser(_userKey: string | null) {
+  // Messages now live on the backend; nothing to do here.
 }
 
 // ---------- API helpers ----------
