@@ -8,6 +8,7 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   vite: {
+    base: '/', // 이 줄이 있는지 확인 혹은 추가
     // TanStack Start가 내부적으로 사용하는 SSR 옵션을 끕니다.
     build: {
       ssr: false,
