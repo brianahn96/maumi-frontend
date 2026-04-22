@@ -103,6 +103,10 @@ export function ChatPanel({
     const content = (text ?? input).trim();
     if (!content || isStreaming) return;
 
+    // Clear input IMMEDIATELY (before any await) so the textarea empties
+    // even when we need to create a new conversation first.
+    if (text === undefined) setInput("");
+
     // Ensure we have a conversation
     let convId = conversationId;
     let isFresh = false;
@@ -125,7 +129,6 @@ export function ChatPanel({
     const next = [...messages, userMsg];
     console.log("[ChatPanel] send: setting messages, count=", next.length, "isFresh=", isFresh, "convId=", convId);
     setMessages(next);
-    setInput("");
     setIsStreaming(true);
 
     // Backend persists the user message automatically when we hit /stream.
