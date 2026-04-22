@@ -55,7 +55,7 @@ type ApiSession = {
 function normalizeSession(s: ApiSession): Conversation {
   return {
     id: String(s.id),
-    title: s.title?.trim() ? s.title : "New chat",
+    title: s.title?.trim() ? s.title : "New Chat",
     created_at: s.created_at,
     updated_at: s.updated_at,
   };
@@ -75,7 +75,7 @@ export async function listConversations(): Promise<Conversation[]> {
 
 export async function createConversation(
   _userId: string,
-  title = "New chat",
+  title = "New Chat",
 ): Promise<Conversation> {
   const resp = await apiFetch(SESSIONS_PATH, {
     method: "POST",

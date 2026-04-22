@@ -116,7 +116,7 @@ export function ChatPanel({
         onConversationCreated(conv.id);
       } catch (e) {
         console.error(e);
-        toast.error("Could not start a new chat");
+        toast.error("Could not start a new Chat");
         return;
       }
     }

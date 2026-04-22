@@ -83,7 +83,7 @@ export function ConversationSidebar({
 
   const commitRename = async () => {
     if (!editingId) return;
-    const title = editingTitle.trim() || "New chat";
+    const title = editingTitle.trim() || "New Chat";
     try {
       await renameConversation(editingId, title);
       setItems((prev) => prev.map((c) => (c.id === editingId ? { ...c, title } : c)));
@@ -113,7 +113,7 @@ export function ConversationSidebar({
           className="h-10 w-full justify-start gap-2 rounded-xl bg-gradient-to-br from-primary to-[var(--primary-glow)] text-primary-foreground shadow-sm hover:opacity-90"
         >
           <Plus className="h-4 w-4" />
-          New chat
+          New Chat
         </Button>
       </div>
 
