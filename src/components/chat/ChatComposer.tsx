@@ -6,7 +6,7 @@ import { Send, Square } from "lucide-react";
 type Props = {
   value: string;
   onChange: (v: string) => void;
-  onSend: () => void;
+  onSend: (text: string) => void;
   onStop?: () => void;
   isStreaming: boolean;
 };
@@ -14,7 +14,6 @@ type Props = {
 export function ChatComposer({ value, onChange, onSend, onStop, isStreaming }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  // auto-resize
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -22,16 +21,23 @@ export function ChatComposer({ value, onChange, onSend, onStop, isStreaming }: P
     el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }, [value]);
 
+  const submitText = (raw: string) => {
+    const nextValue = raw.trim();
+    if (!nextValue || isStreaming) return;
+    onChange("");
+    onSend(nextValue);
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (!isStreaming && value.trim()) onSend();
+      submitText(e.currentTarget.value);
     }
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!isStreaming && value.trim()) onSend();
+    submitText(ref.current?.value ?? value);
   };
 
   return (
