@@ -103,9 +103,8 @@ export function ChatPanel({
     const content = (text ?? input).trim();
     if (!content || isStreaming) return;
 
-    // Clear input IMMEDIATELY (before any await) so the textarea empties
-    // even when we need to create a new conversation first.
-    if (text === undefined) setInput("");
+    // Clear input IMMEDIATELY (before any await) so the textarea empties.
+    setInput("");
 
     // Ensure we have a conversation
     let convId = conversationId;
