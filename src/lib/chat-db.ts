@@ -1,6 +1,11 @@
-// TEMPORARY localStorage-backed chat storage, scoped per user.
-// Swap this module to call FastAPI conversation/message endpoints when ready —
-// the public API (listConversations/createConversation/etc.) stays the same.
+// Chat storage:
+// - Conversations (sessions) are stored on the FastAPI backend at /api/v1/sessions
+// - Messages remain in localStorage scoped per user, keyed by session id
+//   (until backend message endpoints are available)
+
+import { apiFetch } from "@/lib/api-client";
+
+const SESSIONS_PATH = "/api/v1/sessions";
 
 export type Conversation = {
   id: string;
@@ -17,12 +22,9 @@ export type DbMessage = {
   created_at: string;
 };
 
-type Store = {
-  conversations: Conversation[];
-  messages: Record<string, DbMessage[]>; // by conversation_id
-};
+// ---------- Per-user message storage (localStorage) ----------
 
-const EMPTY: Store = { conversations: [], messages: {} };
+type MessageStore = Record<string, DbMessage[]>; // by conversation_id
 
 let currentUserKey: string | null = null;
 
@@ -30,25 +32,25 @@ export function setChatStorageUser(userKey: string | null) {
   currentUserKey = userKey;
 }
 
-function storageKey(): string | null {
+function messagesStorageKey(): string | null {
   if (!currentUserKey) return null;
-  return `sunny:chat:${currentUserKey}`;
+  return `sunny:chat-messages:${currentUserKey}`;
 }
 
-function read(): Store {
-  const key = storageKey();
-  if (!key || typeof window === "undefined") return EMPTY;
+function readMessages(): MessageStore {
+  const key = messagesStorageKey();
+  if (!key || typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(key);
-    if (!raw) return { conversations: [], messages: {} };
-    return JSON.parse(raw) as Store;
+    if (!raw) return {};
+    return JSON.parse(raw) as MessageStore;
   } catch {
-    return { conversations: [], messages: {} };
+    return {};
   }
 }
 
-function write(store: Store) {
-  const key = storageKey();
+function writeMessages(store: MessageStore) {
+  const key = messagesStorageKey();
   if (!key || typeof window === "undefined") return;
   window.localStorage.setItem(key, JSON.stringify(store));
 }
@@ -60,42 +62,87 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+// ---------- API helpers ----------
+
+async function readError(resp: Response): Promise<string> {
+  try {
+    const data = (await resp.json()) as { detail?: unknown };
+    if (typeof data.detail === "string") return data.detail;
+    if (Array.isArray(data.detail) && (data.detail[0] as { msg?: string })?.msg) {
+      return String((data.detail[0] as { msg?: string }).msg);
+    }
+    return resp.statusText || "Request failed";
+  } catch {
+    return resp.statusText || "Request failed";
+  }
+}
+
+type ApiSession = {
+  id: string | number;
+  user_id?: string | number;
+  title?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function normalizeSession(s: ApiSession): Conversation {
+  return {
+    id: String(s.id),
+    title: s.title?.trim() ? s.title : "New chat",
+    created_at: s.created_at,
+    updated_at: s.updated_at,
+  };
+}
+
+// ---------- Conversations API ----------
+
 export async function listConversations(): Promise<Conversation[]> {
-  const { conversations } = read();
-  return [...conversations].sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+  const resp = await apiFetch(SESSIONS_PATH, { method: "GET" });
+  if (!resp.ok) throw new Error(await readError(resp));
+  const data = (await resp.json()) as ApiSession[] | { sessions?: ApiSession[] };
+  const list = Array.isArray(data) ? data : (data.sessions ?? []);
+  return list
+    .map(normalizeSession)
+    .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
 }
 
 export async function createConversation(
   _userId: string,
   title = "New chat",
 ): Promise<Conversation> {
-  const store = read();
-  const now = new Date().toISOString();
-  const conv: Conversation = { id: uid(), title, created_at: now, updated_at: now };
-  store.conversations = [conv, ...store.conversations];
-  store.messages[conv.id] = [];
-  write(store);
-  return conv;
+  const resp = await apiFetch(SESSIONS_PATH, {
+    method: "POST",
+    body: { title },
+  });
+  if (!resp.ok) throw new Error(await readError(resp));
+  const data = (await resp.json()) as ApiSession;
+  return normalizeSession(data);
 }
 
-export async function renameConversation(id: string, title: string) {
-  const store = read();
-  store.conversations = store.conversations.map((c) =>
-    c.id === id ? { ...c, title, updated_at: new Date().toISOString() } : c,
-  );
-  write(store);
+export async function renameConversation(id: string, title: string): Promise<void> {
+  const resp = await apiFetch(`${SESSIONS_PATH}/${id}`, {
+    method: "PATCH",
+    body: { title },
+  });
+  if (!resp.ok) throw new Error(await readError(resp));
 }
 
-export async function deleteConversation(id: string) {
-  const store = read();
-  store.conversations = store.conversations.filter((c) => c.id !== id);
-  delete store.messages[id];
-  write(store);
+export async function deleteConversation(id: string): Promise<void> {
+  const resp = await apiFetch(`${SESSIONS_PATH}/${id}`, { method: "DELETE" });
+  if (!resp.ok && resp.status !== 404) throw new Error(await readError(resp));
+  // Drop local messages for this conversation too
+  const store = readMessages();
+  if (store[id]) {
+    delete store[id];
+    writeMessages(store);
+  }
 }
+
+// ---------- Messages (still local for now) ----------
 
 export async function listMessages(conversationId: string): Promise<DbMessage[]> {
-  const { messages } = read();
-  return messages[conversationId] ?? [];
+  const store = readMessages();
+  return store[conversationId] ?? [];
 }
 
 export async function insertMessage(params: {
@@ -104,7 +151,7 @@ export async function insertMessage(params: {
   role: "user" | "assistant";
   content: string;
 }): Promise<DbMessage> {
-  const store = read();
+  const store = readMessages();
   const msg: DbMessage = {
     id: uid(),
     conversation_id: params.conversationId,
@@ -112,12 +159,8 @@ export async function insertMessage(params: {
     content: params.content,
     created_at: new Date().toISOString(),
   };
-  const existing = store.messages[params.conversationId] ?? [];
-  store.messages[params.conversationId] = [...existing, msg];
-  // Touch conversation updated_at
-  store.conversations = store.conversations.map((c) =>
-    c.id === params.conversationId ? { ...c, updated_at: msg.created_at } : c,
-  );
-  write(store);
+  const existing = store[params.conversationId] ?? [];
+  store[params.conversationId] = [...existing, msg];
+  writeMessages(store);
   return msg;
 }
