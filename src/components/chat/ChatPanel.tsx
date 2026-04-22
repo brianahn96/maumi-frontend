@@ -128,13 +128,7 @@ export function ChatPanel({
     setInput("");
     setIsStreaming(true);
 
-    // Persist user message (fire-and-forget; errors logged)
-    insertMessage({
-      conversationId: convId!,
-      userId: user.id,
-      role: "user",
-      content,
-    }).catch((e) => console.error("persist user msg failed", e));
+    // Backend persists the user message automatically when we hit /stream.
 
     // If fresh, auto-title from first message
     if (isFresh) {
@@ -164,74 +158,20 @@ export function ChatPanel({
     };
 
     try {
-      const resp = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next }),
+      for await (const chunk of streamChat({
+        conversationId: convId!,
+        message: content,
         signal: controller.signal,
-      });
-
-      if (!resp.ok || !resp.body) {
-        let msg = "Something went wrong.";
-        try {
-          const data = await resp.json();
-          msg = data.error ?? msg;
-        } catch {}
-        if (resp.status === 429) msg = "Too many requests. Please wait a moment.";
-        if (resp.status === 402) msg = "AI credits exhausted. Add funds to continue.";
-        toast.error(msg);
-        setIsStreaming(false);
-        return;
+      })) {
+        upsert(chunk);
       }
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let done = false;
-
-      while (!done) {
-        const { done: d, value } = await reader.read();
-        if (d) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        let idx: number;
-        while ((idx = buffer.indexOf("\n")) !== -1) {
-          let line = buffer.slice(0, idx);
-          buffer = buffer.slice(idx + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line || line.startsWith(":")) continue;
-          if (!line.startsWith("data: ")) continue;
-          const json = line.slice(6).trim();
-          if (json === "[DONE]") {
-            done = true;
-            break;
-          }
-          try {
-            const parsed = JSON.parse(json);
-            const c = parsed.choices?.[0]?.delta?.content;
-            if (c) upsert(c);
-          } catch {
-            buffer = line + "\n" + buffer;
-            break;
-          }
-        }
-      }
-
-      // Persist assistant message
-      if (assistantSoFar) {
-        insertMessage({
-          conversationId: convId!,
-          userId: user.id,
-          role: "assistant",
-          content: assistantSoFar,
-        })
-          .then(() => onConversationsChanged())
-          .catch((e) => console.error("persist assistant failed", e));
-      }
+      // Backend has saved both messages — refresh sidebar (updated_at, title)
+      onConversationsChanged();
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         console.error(e);
-        toast.error("Connection error. Please try again.");
+        toast.error((e as Error).message || "Connection error. Please try again.");
       }
     } finally {
       setIsStreaming(false);
