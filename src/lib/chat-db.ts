@@ -111,7 +111,10 @@ type ApiMessage = {
 };
 
 function normalizeMessage(m: ApiMessage, fallbackConvId: string): DbMessage {
-  const role = m.role === "assistant" ? "assistant" : "user";
+  // Be permissive about role naming from the backend.
+  const r = String(m.role ?? "").toLowerCase();
+  const role: "user" | "assistant" =
+    r === "user" || r === "human" ? "user" : "assistant";
   const convId = m.session_id ?? m.conversation_id ?? fallbackConvId;
   return {
     id: String(m.id),
