@@ -257,7 +257,7 @@ export function ChatPanel({
           <ChatComposer
             value={input}
             onChange={setInput}
-            onSend={() => send()}
+            onSend={send}
             onStop={stop}
             isStreaming={isStreaming}
           />
