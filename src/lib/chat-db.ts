@@ -97,37 +97,103 @@ export async function renameConversation(id: string, title: string): Promise<voi
 export async function deleteConversation(id: string): Promise<void> {
   const resp = await apiFetch(`${SESSIONS_PATH}/${id}`, { method: "DELETE" });
   if (!resp.ok && resp.status !== 404) throw new Error(await readError(resp));
-  // Drop local messages for this conversation too
-  const store = readMessages();
-  if (store[id]) {
-    delete store[id];
-    writeMessages(store);
-  }
 }
 
-// ---------- Messages (still local for now) ----------
+// ---------- Messages API ----------
+
+type ApiMessage = {
+  id: string | number;
+  role: string;
+  content: string;
+  created_at: string;
+  session_id?: string | number;
+  conversation_id?: string | number;
+};
+
+function normalizeMessage(m: ApiMessage, fallbackConvId: string): DbMessage {
+  const role = m.role === "assistant" ? "assistant" : "user";
+  const convId = m.session_id ?? m.conversation_id ?? fallbackConvId;
+  return {
+    id: String(m.id),
+    conversation_id: String(convId),
+    role,
+    content: m.content,
+    created_at: m.created_at,
+  };
+}
 
 export async function listMessages(conversationId: string): Promise<DbMessage[]> {
-  const store = readMessages();
-  return store[conversationId] ?? [];
+  const resp = await apiFetch(`${CHAT_PATH}/${conversationId}/messages`, { method: "GET" });
+  if (!resp.ok) throw new Error(await readError(resp));
+  const data = (await resp.json()) as ApiMessage[] | { messages?: ApiMessage[] };
+  const list = Array.isArray(data) ? data : (data.messages ?? []);
+  return list
+    .map((m) => normalizeMessage(m, conversationId))
+    .sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
 }
 
-export async function insertMessage(params: {
+/**
+ * Stream an assistant reply from the FastAPI backend.
+ * The backend persists both the user message and the assistant reply.
+ *
+ * Yields incremental text chunks as they arrive (parsed from OpenAI-style SSE
+ * `data: {...}` lines).
+ */
+export async function* streamChat(params: {
   conversationId: string;
-  userId: string;
-  role: "user" | "assistant";
-  content: string;
-}): Promise<DbMessage> {
-  const store = readMessages();
-  const msg: DbMessage = {
-    id: uid(),
-    conversation_id: params.conversationId,
-    role: params.role,
-    content: params.content,
-    created_at: new Date().toISOString(),
+  message: string;
+  signal?: AbortSignal;
+}): AsyncGenerator<string, void, void> {
+  const token = getAccessToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
   };
-  const existing = store[params.conversationId] ?? [];
-  store[params.conversationId] = [...existing, msg];
-  writeMessages(store);
-  return msg;
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const resp = await fetch(`${API_BASE_URL}${CHAT_PATH}/${params.conversationId}/stream`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ message: params.message }),
+    credentials: "include",
+    signal: params.signal,
+  });
+
+  if (!resp.ok || !resp.body) {
+    if (resp.status === 429) throw new Error("Too many requests. Please wait a moment.");
+    if (resp.status === 402) throw new Error("AI credits exhausted.");
+    throw new Error(await readError(resp));
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let idx: number;
+    while ((idx = buffer.indexOf("\n")) !== -1) {
+      let line = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 1);
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (!line || line.startsWith(":")) continue;
+      if (!line.startsWith("data: ")) continue;
+      const json = line.slice(6).trim();
+      if (json === "[DONE]") return;
+      try {
+        const parsed = JSON.parse(json);
+        const c =
+          parsed.choices?.[0]?.delta?.content ??
+          parsed.delta?.content ??
+          parsed.content ??
+          "";
+        if (c) yield c as string;
+      } catch {
+        buffer = line + "\n" + buffer;
+        break;
+      }
+    }
+  }
 }
