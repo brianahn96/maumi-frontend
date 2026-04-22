@@ -1,11 +1,12 @@
 // Chat storage:
 // - Conversations (sessions) are stored on the FastAPI backend at /api/v1/sessions
-// - Messages remain in localStorage scoped per user, keyed by session id
-//   (until backend message endpoints are available)
+// - Messages are stored on the FastAPI backend at /api/v1/chat/{session_id}/messages
+//   (the backend persists user + assistant messages automatically when streaming)
 
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, API_BASE_URL, getAccessToken } from "@/lib/api-client";
 
 const SESSIONS_PATH = "/api/v1/sessions";
+const CHAT_PATH = "/api/v1/chat";
 
 export type Conversation = {
   id: string;
