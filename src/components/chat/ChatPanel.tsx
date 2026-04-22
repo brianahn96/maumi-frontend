@@ -142,13 +142,12 @@ export function ChatPanel({
     abortRef.current = controller;
 
     let assistantSoFar = "";
-    let createdAssistant = false;
 
     const upsert = (chunk: string) => {
       assistantSoFar += chunk;
       setMessages((prev) => {
-        if (!createdAssistant) {
-          createdAssistant = true;
+        const lastMessage = prev[prev.length - 1];
+        if (lastMessage?.role !== "assistant") {
           return [...prev, { role: "assistant", content: assistantSoFar }];
         }
         return prev.map((m, i) =>
