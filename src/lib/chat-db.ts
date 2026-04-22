@@ -111,7 +111,10 @@ type ApiMessage = {
 };
 
 function normalizeMessage(m: ApiMessage, fallbackConvId: string): DbMessage {
-  const role = m.role === "assistant" ? "assistant" : "user";
+  // Be permissive about role naming from the backend.
+  const r = String(m.role ?? "").toLowerCase();
+  const role: "user" | "assistant" =
+    r === "user" || r === "human" ? "user" : "assistant";
   const convId = m.session_id ?? m.conversation_id ?? fallbackConvId;
   return {
     id: String(m.id),
@@ -168,31 +171,88 @@ export async function* streamChat(params: {
   const decoder = new TextDecoder();
   let buffer = "";
 
+  // Extract the chunk content from a single SSE event payload.
+  // Supports JSON shapes ({content}, {text}, {delta:{content}}, OpenAI choices)
+  // and falls back to raw text.
+  const extractChunk = (raw: string): string => {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed === "[DONE]") return "";
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return (
+          parsed.choices?.[0]?.delta?.content ??
+          parsed.delta?.content ??
+          parsed.content ??
+          parsed.text ??
+          ""
+        );
+      } catch {
+        // Fall through to raw
+      }
+    }
+    return raw;
+  };
+
+  // Process all complete SSE events (delimited by a blank line) currently
+  // sitting in the buffer. Returns the leftover unprocessed tail.
+  const flushEvents = function* (chunkText: string): Generator<string> {
+    let rest = chunkText;
+    while (true) {
+      // Accept both \n\n and \r\n\r\n delimiters
+      const idx = rest.search(/\r?\n\r?\n/);
+      if (idx === -1) break;
+      const eventBlock = rest.slice(0, idx);
+      const matchLen = rest.slice(idx).match(/^\r?\n\r?\n/)![0].length;
+      rest = rest.slice(idx + matchLen);
+
+      const dataLines: string[] = [];
+      for (const rawLine of eventBlock.split(/\r?\n/)) {
+        if (!rawLine || rawLine.startsWith(":")) continue;
+        if (rawLine.startsWith("data:")) {
+          // Strip "data:" and the single optional leading space
+          const v = rawLine.slice(5);
+          dataLines.push(v.startsWith(" ") ? v.slice(1) : v);
+        }
+      }
+      if (dataLines.length === 0) continue;
+      const payload = dataLines.join("\n");
+      if (payload.trim() === "[DONE]") {
+        // Signal done by yielding a sentinel — handled by outer loop
+        yield "\u0000__DONE__";
+        return;
+      }
+      const c = extractChunk(payload);
+      if (c) yield c;
+    }
+    buffer = rest;
+  };
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
+    for (const out of flushEvents(buffer)) {
+      if (out === "\u0000__DONE__") return;
+      yield out;
+    }
+  }
 
-    let idx: number;
-    while ((idx = buffer.indexOf("\n")) !== -1) {
-      let line = buffer.slice(0, idx);
-      buffer = buffer.slice(idx + 1);
-      if (line.endsWith("\r")) line = line.slice(0, -1);
-      if (!line || line.startsWith(":")) continue;
-      if (!line.startsWith("data: ")) continue;
-      const json = line.slice(6).trim();
-      if (json === "[DONE]") return;
-      try {
-        const parsed = JSON.parse(json);
-        const c =
-          parsed.choices?.[0]?.delta?.content ??
-          parsed.delta?.content ??
-          parsed.content ??
-          "";
-        if (c) yield c as string;
-      } catch {
-        buffer = line + "\n" + buffer;
-        break;
+  // Flush any final event without trailing blank line
+  if (buffer.trim()) {
+    const dataLines: string[] = [];
+    for (const rawLine of buffer.split(/\r?\n/)) {
+      if (!rawLine || rawLine.startsWith(":")) continue;
+      if (rawLine.startsWith("data:")) {
+        const v = rawLine.slice(5);
+        dataLines.push(v.startsWith(" ") ? v.slice(1) : v);
+      }
+    }
+    if (dataLines.length) {
+      const payload = dataLines.join("\n");
+      if (payload.trim() !== "[DONE]") {
+        const c = extractChunk(payload);
+        if (c) yield c;
       }
     }
   }
