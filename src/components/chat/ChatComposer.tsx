@@ -13,6 +13,7 @@ type Props = {
 
 export function ChatComposer({ value, onChange, onSend, onStop, isStreaming }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const isComposingRef = useRef(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -21,14 +22,23 @@ export function ChatComposer({ value, onChange, onSend, onStop, isStreaming }: P
     el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }, [value]);
 
+  const clearTextarea = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.value = "";
+    el.style.height = "auto";
+  };
+
   const submitText = (raw: string) => {
     const nextValue = raw.trim();
     if (!nextValue || isStreaming) return;
+    clearTextarea();
     onChange("");
     onSend(nextValue);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing || isComposingRef.current) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       submitText(e.currentTarget.value);
@@ -37,6 +47,7 @@ export function ChatComposer({ value, onChange, onSend, onStop, isStreaming }: P
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    if (isComposingRef.current) return;
     submitText(ref.current?.value ?? value);
   };
 
@@ -49,6 +60,13 @@ export function ChatComposer({ value, onChange, onSend, onStop, isStreaming }: P
         ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onCompositionStart={() => {
+          isComposingRef.current = true;
+        }}
+        onCompositionEnd={(e) => {
+          isComposingRef.current = false;
+          onChange(e.currentTarget.value);
+        }}
         onKeyDown={handleKeyDown}
         placeholder="Message Sunny…"
         rows={1}
