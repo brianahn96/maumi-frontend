@@ -166,9 +166,6 @@ export function ChatPanel({
       })) {
         upsert(chunk);
       }
-
-      // Backend has saved both messages — refresh sidebar (updated_at, title)
-      onConversationsChanged();
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         console.error(e);
