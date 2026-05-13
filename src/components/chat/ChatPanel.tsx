@@ -207,6 +207,9 @@ export function ChatPanel({
             </p>
           </div>
         </div>
+        <div className="ml-auto">
+          <LanguageSwitcher />
+        </div>
       </header>
 
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden px-3 lg:max-w-5xl xl:max-w-6xl sm:px-6">
