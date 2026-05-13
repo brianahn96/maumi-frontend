@@ -5,6 +5,7 @@ import { TypingIndicator } from "./TypingIndicator";
 import { toast } from "sonner";
 import { Sparkles, Menu } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useI18n, type TKey } from "@/lib/i18n";
 import {
   createConversation,
   listMessages,
@@ -14,11 +15,11 @@ import {
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-const SUGGESTIONS = [
-  "Give me a warm-up writing prompt",
-  "Explain quantum entanglement simply",
-  "Plan a cozy weekend in Lisbon",
-  "Help me name my coffee shop",
+const SUGGESTION_KEYS: TKey[] = [
+  "suggestion.1",
+  "suggestion.2",
+  "suggestion.3",
+  "suggestion.4",
 ];
 
 type Props = {
@@ -35,6 +36,7 @@ export function ChatPanel({
   onOpenSidebar,
 }: Props) {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [messages, _setMessages] = useState<Msg[]>([]);
   const setMessages: typeof _setMessages = (updater) => {
     _setMessages((prev) => {
@@ -77,7 +79,7 @@ export function ChatPanel({
       })
       .catch((e) => {
         console.error(e);
-        toast.error("Could not load chat history");
+        toast.error(t("chat.couldNotLoad"));
       })
       .finally(() => {
         if (!cancelled) setLoadingHistory(false);
@@ -119,7 +121,7 @@ export function ChatPanel({
         onConversationCreated(conv.id);
       } catch (e) {
         console.error(e);
-        toast.error("Could not start a new Chat");
+        toast.error(t("chat.couldNotStart"));
         return;
       }
     }
@@ -169,7 +171,7 @@ export function ChatPanel({
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         console.error(e);
-        toast.error((e as Error).message || "Connection error. Please try again.");
+        toast.error((e as Error).message || t("chat.connectionError"));
       }
     } finally {
       setIsStreaming(false);
@@ -188,7 +190,7 @@ export function ChatPanel({
           <button
             onClick={onOpenSidebar}
             className="rounded-xl p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground md:hidden"
-            aria-label="Open menu"
+            aria-label={t("sidebar.openMenu")}
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -200,7 +202,7 @@ export function ChatPanel({
           <div>
             <h1 className="text-base font-bold tracking-tight sm:text-lg">Sunny</h1>
             <p className="text-[11px] text-muted-foreground sm:text-xs">
-              Your friendly AI companion
+              {t("app.tagline")}
             </p>
           </div>
         </div>
@@ -219,22 +221,25 @@ export function ChatPanel({
               </div>
               <div className="space-y-2">
                 <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                  Hi, I'm Sunny ☀
+                  {t("chat.greeting")}
                 </h2>
                 <p className="max-w-sm text-sm text-muted-foreground sm:text-base">
-                  Ask me anything, brainstorm an idea, or just say hello. I'm here to help.
+                  {t("chat.greetingSub")}
                 </p>
               </div>
               <div className="grid w-full max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
-                {SUGGESTIONS.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => send(s)}
-                    className="bubble-assistant rounded-2xl px-4 py-3 text-left text-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    {s}
-                  </button>
-                ))}
+                {SUGGESTION_KEYS.map((k) => {
+                  const label = t(k);
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => send(label)}
+                      className="bubble-assistant rounded-2xl px-4 py-3 text-left text-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : (
@@ -259,7 +264,7 @@ export function ChatPanel({
             isStreaming={isStreaming}
           />
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            Sunny can make mistakes. Double-check important info.
+            {t("chat.disclaimer")}
           </p>
         </div>
       </div>

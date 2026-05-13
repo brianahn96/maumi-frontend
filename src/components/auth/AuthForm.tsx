@@ -5,11 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 type Mode = "signin" | "signup";
 
 export function AuthForm() {
   const { signIn, signUp } = useAuth();
+  const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,12 +25,12 @@ export function AuthForm() {
     try {
       if (mode === "signup") {
         await signUp(email, password);
-        toast.success("Welcome to Sunny ☀");
+        toast.success(t("auth.welcomeToast"));
       } else {
         await signIn(email, password);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(err instanceof Error ? err.message : t("auth.somethingWrong"));
     } finally {
       setBusy(false);
     }
@@ -36,25 +39,26 @@ export function AuthForm() {
   return (
     <div className="flex min-h-[100dvh] items-center justify-center px-4 py-10">
       <div className="bubble-assistant w-full max-w-md rounded-3xl p-6 sm:p-8">
+        <div className="mb-4 flex justify-end">
+          <LanguageSwitcher />
+        </div>
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[var(--primary-glow)] text-2xl shadow-lg">
             <Sparkles className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              {mode === "signin" ? "Welcome back" : "Create your account"}
+              {mode === "signin" ? t("auth.welcomeBack") : t("auth.createAccount")}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {mode === "signin"
-                ? "Sign in to chat with Sunny ☀"
-                : "Sign up to start chatting with Sunny ☀"}
+              {mode === "signin" ? t("auth.signInSub") : t("auth.signUpSub")}
             </p>
           </div>
         </div>
 
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("auth.email")}</Label>
             <Input
               id="email"
               type="email"
@@ -67,7 +71,7 @@ export function AuthForm() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("auth.password")}</Label>
             <Input
               id="password"
               type="password"
@@ -85,18 +89,22 @@ export function AuthForm() {
             disabled={busy}
             className="h-11 w-full rounded-xl bg-gradient-to-br from-primary to-[var(--primary-glow)] text-primary-foreground shadow-md hover:opacity-90"
           >
-            {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+            {busy
+              ? t("auth.pleaseWait")
+              : mode === "signin"
+                ? t("auth.signIn")
+                : t("auth.createBtn")}
           </Button>
         </form>
 
         <div className="mt-5 text-center text-sm text-muted-foreground">
-          {mode === "signin" ? "New to Sunny?" : "Already have an account?"}{" "}
+          {mode === "signin" ? t("auth.newToSunny") : t("auth.haveAccount")}{" "}
           <button
             type="button"
             onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
             className="font-semibold text-primary hover:underline"
           >
-            {mode === "signin" ? "Create an account" : "Sign in"}
+            {mode === "signin" ? t("auth.createLink") : t("auth.signIn")}
           </button>
         </div>
       </div>
