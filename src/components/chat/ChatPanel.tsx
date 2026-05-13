@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Sparkles, Menu } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useI18n, type TKey } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import {
   createConversation,
   listMessages,
@@ -205,6 +206,9 @@ export function ChatPanel({
               {t("app.tagline")}
             </p>
           </div>
+        </div>
+        <div className="ml-auto">
+          <LanguageSwitcher />
         </div>
       </header>
 
