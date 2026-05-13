@@ -202,8 +202,7 @@ export function ConversationSidebar({
         )}
       </div>
 
-      <div className="space-y-2 border-t border-border/60 p-3">
-        <LanguageSwitcher className="w-full justify-center" />
+      <div className="border-t border-border/60 p-3">
         <button
           onClick={() => signOut()}
           className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground"
