@@ -2,6 +2,7 @@ import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Square } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 type Props = {
   value: string;
@@ -14,6 +15,7 @@ type Props = {
 export function ChatComposer({ value, onChange, onSend, onStop, isStreaming }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const isComposingRef = useRef(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     const el = ref.current;
@@ -68,7 +70,7 @@ export function ChatComposer({ value, onChange, onSend, onStop, isStreaming }: P
           onChange(e.currentTarget.value);
         }}
         onKeyDown={handleKeyDown}
-        placeholder="Message Sunny…"
+        placeholder={t("composer.placeholder")}
         rows={1}
         className="min-h-[40px] flex-1 resize-none border-0 bg-transparent px-0 py-2 text-[15px] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
       />
@@ -78,7 +80,7 @@ export function ChatComposer({ value, onChange, onSend, onStop, isStreaming }: P
           onClick={onStop}
           size="icon"
           className="h-10 w-10 shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/90"
-          aria-label="Stop"
+          aria-label={t("composer.stop")}
         >
           <Square className="h-4 w-4 fill-current" />
         </Button>
@@ -88,7 +90,7 @@ export function ChatComposer({ value, onChange, onSend, onStop, isStreaming }: P
           size="icon"
           disabled={!value.trim()}
           className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-primary to-[var(--primary-glow)] text-primary-foreground shadow-md transition hover:opacity-90 disabled:opacity-50"
-          aria-label="Send"
+          aria-label={t("composer.send")}
         >
           <Send className="h-4 w-4" />
         </Button>
