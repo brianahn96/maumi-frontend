@@ -4,11 +4,13 @@ import { ChatPanel } from "./ChatPanel";
 import { listConversations } from "@/lib/chat-db";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export function ChatLayout() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { t } = useI18n();
 
   // Pick most recent conversation on first load
   useEffect(() => {
@@ -59,7 +61,7 @@ export function ChatLayout() {
           <button
             onClick={() => setMobileOpen(false)}
             className="absolute right-2 top-2 z-10 rounded-lg p-1.5 text-muted-foreground hover:bg-secondary"
-            aria-label="Close menu"
+            aria-label={t("sidebar.closeMenu")}
           >
             <X className="h-4 w-4" />
           </button>

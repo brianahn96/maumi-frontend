@@ -11,6 +11,8 @@ import {
 import { Plus, Trash2, MessageSquare, LogOut, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 type Props = {
   activeId: string | null;
@@ -28,6 +30,7 @@ export function ConversationSidebar({
   onClose,
 }: Props) {
   const { user, signOut } = useAuth();
+  const { t } = useI18n();
   const [items, setItems] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -57,7 +60,7 @@ export function ConversationSidebar({
       onClose?.();
     } catch (e) {
       console.error(e);
-      toast.error("Could not create chat");
+      toast.error(t("sidebar.couldNotCreate"));
     }
   };
 
@@ -72,7 +75,7 @@ export function ConversationSidebar({
       }
     } catch (e) {
       console.error(e);
-      toast.error("Could not delete");
+      toast.error(t("sidebar.couldNotDelete"));
     }
   };
 
@@ -83,13 +86,13 @@ export function ConversationSidebar({
 
   const commitRename = async () => {
     if (!editingId) return;
-    const title = editingTitle.trim() || "New Chat";
+    const title = editingTitle.trim() || t("sidebar.newChatTitle");
     try {
       await renameConversation(editingId, title);
       setItems((prev) => prev.map((c) => (c.id === editingId ? { ...c, title } : c)));
     } catch (e) {
       console.error(e);
-      toast.error("Could not rename");
+      toast.error(t("sidebar.couldNotRename"));
     } finally {
       setEditingId(null);
     }
@@ -113,16 +116,16 @@ export function ConversationSidebar({
           className="h-10 w-full justify-start gap-2 rounded-xl bg-gradient-to-br from-primary to-[var(--primary-glow)] text-primary-foreground shadow-sm hover:opacity-90"
         >
           <Plus className="h-4 w-4" />
-          New Chat
+          {t("sidebar.newChat")}
         </Button>
       </div>
 
       <div className="mt-4 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2 [scrollbar-width:thin]">
         {loading ? (
-          <div className="px-3 py-6 text-center text-xs text-muted-foreground">Loading…</div>
+          <div className="px-3 py-6 text-center text-xs text-muted-foreground">{t("sidebar.loading")}</div>
         ) : items.length === 0 ? (
           <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-            No chats yet. Start one ☀
+            {t("sidebar.empty")}
           </div>
         ) : (
           items.map((c) => {
@@ -153,14 +156,14 @@ export function ConversationSidebar({
                     <button
                       onClick={commitRename}
                       className="rounded-md p-1 hover:bg-background"
-                      aria-label="Save"
+                      aria-label={t("sidebar.save")}
                     >
                       <Check className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
                       className="rounded-md p-1 hover:bg-background"
-                      aria-label="Cancel"
+                      aria-label={t("sidebar.cancel")}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -180,14 +183,14 @@ export function ConversationSidebar({
                     <button
                       onClick={() => startRename(c)}
                       className="rounded-md p-1 opacity-0 hover:bg-background group-hover:opacity-100"
-                      aria-label="Rename"
+                      aria-label={t("sidebar.rename")}
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(c.id)}
                       className="rounded-md p-1 opacity-0 hover:bg-background hover:text-destructive group-hover:opacity-100"
-                      aria-label="Delete"
+                      aria-label={t("sidebar.delete")}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -199,13 +202,14 @@ export function ConversationSidebar({
         )}
       </div>
 
-      <div className="border-t border-border/60 p-3">
+      <div className="space-y-2 border-t border-border/60 p-3">
+        <LanguageSwitcher className="w-full justify-center" />
         <button
           onClick={() => signOut()}
           className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground"
         >
           <LogOut className="h-4 w-4" />
-          Sign out
+          {t("sidebar.signOut")}
         </button>
       </div>
     </aside>
