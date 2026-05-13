@@ -3,6 +3,7 @@ import { ChatLayout } from "@/components/chat/ChatLayout";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { Toaster } from "@/components/ui/sonner";
+import { I18nProvider } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -26,9 +27,11 @@ function Gate() {
 
 function Index() {
   return (
-    <AuthProvider>
-      <Gate />
-      <Toaster position="top-center" />
-    </AuthProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <Gate />
+        <Toaster position="top-center" />
+      </AuthProvider>
+    </I18nProvider>
   );
 }
